@@ -1,29 +1,33 @@
 import os
 import re
+import base64
 from cryptography.fernet import Fernet
 from PIL import Image
 import io
 from google import genai
-from google.genai import errors
 
-# Fallback encryption key setup
 _DEFAULT_FALLBACK_KEY = b'12345678901234567890123456789012'
-import base64
 _STATIC_KEY = base64.urlsafe_b64encode(_DEFAULT_FALLBACK_KEY)
 
 _ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", _STATIC_KEY)
 if isinstance(_ENCRYPTION_KEY, str):
     _ENCRYPTION_KEY = _ENCRYPTION_KEY.encode()
 
-cipher = Fernet(_ENCRYPTION_KEY)
+try:
+    cipher = Fernet(_ENCRYPTION_KEY)
+except Exception:
+    cipher = Fernet(_STATIC_KEY)
 
 INVALID_PHRASES = ["kya bola", "kya?", "hein?", "samjha nahi", "bata", "are", "hmm"]
 
-# Initialize Gemini Client using official Google GenAI SDK
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+ai_client = None
+if GEMINI_API_KEY:
+    try:
+        ai_client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception:
+        ai_client = None
 
-# Latest high-availability Gemini models list for failover protection
 GEMINI_FALLBACK_MODELS = [
     "gemini-3.8-flash",
     "gemini-4-argon",
@@ -33,7 +37,6 @@ GEMINI_FALLBACK_MODELS = [
 ]
 
 def ask_gemini_with_fallback(prompt: str) -> str:
-    """Tries multiple Gemini models sequentially to prevent response failures."""
     if not ai_client:
         return "Gemini API key configured nahi hai bhai!"
     
@@ -45,8 +48,7 @@ def ask_gemini_with_fallback(prompt: str) -> str:
             )
             if response and response.text:
                 return response.text
-        except Exception as e:
-            # Log error internally and try next model in the list
+        except Exception:
             continue
             
     return "Sabhi AI models filhal busy hain, thodi der baad try karo!"
@@ -78,7 +80,10 @@ def validate_input(field: str, value: any) -> dict:
 def encrypt_data(text: str) -> str:
     if not text:
         return ""
-    return cipher.encrypt(text.encode()).decode()
+    try:
+        return cipher.encrypt(text.encode()).decode()
+    except Exception:
+        return text
 
 def decrypt_data(encrypted_text: str) -> str:
     if not encrypted_text:
