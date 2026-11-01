@@ -10,7 +10,10 @@ import models
 from database import engine, get_db
 from utils import validate_input, encrypt_data, decrypt_data, to_fancy_font, check_image_quality, ask_gemini_with_fallback
 
-models.Base.metadata.create_all(bind=engine)
+try:
+    models.Base.metadata.create_all(bind=engine)
+except Exception:
+    pass
 
 app = FastAPI(title="FitRoast AI Fitness API", version="1.0")
 
@@ -64,6 +67,20 @@ def handle_validation(field: str, value: any):
             status_code=400,
             detail=to_fancy_font("Ye valid nahi laga, ek baar sahi se batao")
         )
+
+@app.get("/")
+def home():
+    return {"status": "Active", "message": to_fancy_font("FitRoast AI Fitness API is running successfully! 🚀")}
+
+@app.get("/api/test")
+def direct_browser_test(msg: str = "hello"):
+    """Allows direct testing via browser link by passing query parameters like ?msg=hello"""
+    ai_response = ask_gemini_with_fallback(f"Respond in Hinglish gym slang to: {msg}")
+    return {
+        "status": to_fancy_font("Success"),
+        "received_message": msg,
+        "ai_roast_response": to_fancy_font(ai_response if ai_response else "Bhai sab theek hai, workout kar le!")
+    }
 
 @app.post("/api/user/onboard")
 def onboard_user(payload: UserOnboardSchema, db: Session = Depends(get_db)):
@@ -182,7 +199,6 @@ def log_workout(payload: WorkoutLogSchema, db: Session = Depends(get_db)):
 
     roast_or_praise = "Shabash! Form ekdum mast tha! 🎯"
     if payload.wrong_form_count > 0:
-        # Optionally use Gemini fallback to generate dynamic savage Hinglish roasts
         ai_prompt = f"Roast a gym user in Hinglish slang for doing wrong form in {payload.exercise_name} with {payload.wrong_form_count} wrong reps."
         gemini_roast = ask_gemini_with_fallback(ai_prompt)
         roast_or_praise = gemini_roast if gemini_roast else random.choice(ROAST_MESSAGES_FORM)
@@ -309,3 +325,4 @@ def get_progress(chat_id: str, db: Session = Depends(get_db)):
         "total_workouts_logged": len(workouts),
         "fancy_heading": to_fancy_font("Progress Report")
     }
+    
