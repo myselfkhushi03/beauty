@@ -3,7 +3,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fitroast.db")
+# Vercel par root read-only hota hai, isiliye SQLite ke liye /tmp use karein agar DATABASE_URL na ho
+default_db = "sqlite:////tmp/fitroast.db"
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", default_db)
 
 connect_args = {"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
 
